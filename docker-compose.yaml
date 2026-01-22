@@ -45,7 +45,7 @@ services:
       POSTGRES_USER: ${DB_USER_NAME:-letterspaceuser}
       POSTGRES_PASSWORD: ${DB_USER_PASS:-changeme_db_password}
     volumes:
-      - './rootfs/db/postgres/letterspace:/var/lib/postgresql/data:rw'
+      - './rootfs/data/db/postgres/letterspace:/var/lib/postgresql/data:rw'
     healthcheck:
       test:
         [
