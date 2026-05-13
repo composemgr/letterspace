@@ -9,7 +9,7 @@ x-logging: &default-logging
 
 services:
   app:
-    image: ghcr.io/dcodesdev/letterspace:latest-node
+    image: ghcr.io/dcodesdev/letterspace:latest
     container_name: letterspace-app
     hostname: ${BASE_HOST_NAME:-$HOSTNAME}
     restart: always
@@ -18,11 +18,12 @@ services:
     environment:
       TZ: ${TZ:-America/New_York}
       DATABASE_URL: postgresql://${DB_USER_NAME:-letterspaceuser}:${DB_USER_PASS:-changeme_db_password}@letterspace-db:5432/${DB_CREATE_DATABASE_NAME:-letterspace}?schema=public
-      JWT_SECRET: ${APP_JWT_TOKEN:-changeme_jwt_secret}
+      JWT_SECRET: ${APP_SECRET_KEY:-changeme_secret_key_min_32_chars}
     ports:
       - '172.17.0.1:61007:5000'
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     networks:
       - letterspace
     healthcheck:
@@ -33,7 +34,7 @@ services:
       start_period: 90s
 
   db:
-    image: postgres:17
+    image: postgres:latest
     container_name: letterspace-db
     hostname: letterspace-db
     restart: always
@@ -47,16 +48,7 @@ services:
     volumes:
       - './volumes/data/db/postgres/letterspace:/var/lib/postgresql/data:rw'
     healthcheck:
-      test:
-        [
-          'CMD',
-          'pg_isready',
-          '-q',
-          '-d',
-          'letterspace',
-          '-U',
-          'letterspaceuser',
-        ]
+      test: ['CMD-SHELL', 'pg_isready -q -d $${POSTGRES_DB} -U $${POSTGRES_USER}']
       timeout: 45s
       interval: 10s
       retries: 10
