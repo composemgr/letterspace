@@ -17,6 +17,8 @@ services:
     logging: *default-logging
     environment:
       TZ: ${TZ:-America/New_York}
+      CONTAINER_NAME: letterspace-app
+      HOSTNAME: ${BASE_HOST_NAME:-$HOSTNAME}
       DATABASE_URL: postgresql://${DB_USER_NAME:-letterspaceuser}:${DB_USER_PASS:-changeme_db_password}@letterspace-db:5432/${DB_CREATE_DATABASE_NAME:-letterspace}?schema=public
       JWT_SECRET: ${APP_SECRET_KEY:-changeme_secret_key_min_32_chars}
     ports:
@@ -26,12 +28,30 @@ services:
         condition: service_healthy
     networks:
       - letterspace
+      - proxy
+      - cloudflare
     healthcheck:
       test: timeout 10s bash -c ':> /dev/tcp/127.0.0.1/5000' || exit 1
       interval: 10s
       timeout: 5s
       retries: 3
       start_period: 90s
+    labels:
+      - 'traefik.enable=true'
+      - 'cloudflare.enable=true'
+      - 'traefik.docker.network=proxy'
+      - 'cloudflare.service=http://letterspace-app:5000'
+      - 'cloudflare.hostname=letterspace.${CLOUDFLARE_ZONE_NAME:-}'
+      - 'traefik.http.routers.letterspace-app.entrypoints=http'
+      - 'traefik.http.routers.letterspace-app-secure.tls=true'
+      - 'traefik.http.routers.letterspace-app.rule=Host($(${BASE_HOST_NAME:-$HOSTNAME}))'
+      - 'traefik.http.middlewares.letterspace-app-https-redirect.redirectscheme.scheme=https'
+      - 'traefik.http.routers.letterspace-app.middlewares=letterspace-app-https-redirect'
+      - 'traefik.http.routers.letterspace-app-secure.entrypoints=https'
+      - 'traefik.http.routers.letterspace-app-secure.rule=Host($(${BASE_HOST_NAME:-$HOSTNAME}))'
+      - 'traefik.http.routers.letterspace-app-secure.tls.certresolver=cloudflare'
+      - 'traefik.http.routers.letterspace-app-secure.service=letterspace-app'
+      - 'traefik.http.services.letterspace-app.loadbalancer.server.port=5000'
 
   db:
     image: postgres:latest
@@ -42,6 +62,7 @@ services:
     logging: *default-logging
     environment:
       TZ: ${TZ:-America/New_York}
+      CONTAINER_NAME: letterspace-db
       POSTGRES_DB: ${DB_CREATE_DATABASE_NAME:-letterspace}
       POSTGRES_USER: ${DB_USER_NAME:-letterspaceuser}
       POSTGRES_PASSWORD: ${DB_USER_PASS:-changeme_db_password}
@@ -59,3 +80,7 @@ networks:
   letterspace:
     name: letterspace
     external: false
+  proxy:
+    external: true
+  cloudflare:
+    external: true
